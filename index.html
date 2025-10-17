@@ -161,7 +161,6 @@
   </div>
 
   <script>
-    // Tables kWhc de base
     const data = {
       maison: {
         baseValues: {
@@ -198,10 +197,8 @@
       zoneFactors: { 'H1': 1.2, 'H2': 1, 'H3': 0.7 }
     };
 
-    // MPR pour PAC seule (base)
     const mprPAC = { bleu: 5000, jaune: 4000, violet: 3000, rose: 0 };
 
-    // MPR additionnelle liée au ballon
     const mprByEcs = {
       "Ballon thermodynamique": { bleu: 1200, jaune: 800, violet: 0, rose: 0 },
       "Ballon électrique": { bleu: 0, jaune: 0, violet: 0, rose: 0 },
@@ -253,15 +250,16 @@
     }
 
     function updateCumacPrice() {
+      // ECO NEGOCE -> 12.5 € bleu, 7.4 € autres
+      // VALOREN    -> 11 € bleu, 7 € autres
       const deleg = document.getElementById('delegBadge').textContent.trim().toUpperCase();
       let price = 12.5;
       if (deleg === 'VALOREN') {
-        price = 7.0;
+        price = (currentMprCat === 'bleu') ? 11.0 : 7.0;
       } else if (deleg === 'ECO NEGOCE') {
         price = (currentMprCat === 'bleu') ? 12.5 : 7.4;
       }
-      const input = document.getElementById('mwhCumacPrice');
-      input.value = price.toFixed(1);
+      document.getElementById('mwhCumacPrice').value = price.toFixed(1);
     }
 
     function calculate() {
@@ -290,7 +288,6 @@
 
       const cee = (finalKwhCumac / 1000) * mwhCumacPrice;
 
-      // MPR = aide PAC + aide Ballon si un ballon est choisi
       const mprPac = mprPAC[currentMprCat] || 0;
       const mprBallon = ecsType ? mprBallonAmount(ecsType, currentMprCat) : 0;
       const mprTotal = mprPac + mprBallon;
@@ -312,6 +309,7 @@
           currentMprCat = el.getAttribute('data-cat');
           updateCumacPrice();
           calculate();
+          renderDelegAuto();
         });
       });
     }
