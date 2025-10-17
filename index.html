@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Calcul Aides PAC</title>
+  <style>
+    :root {
+      --bg1:#dff7e5; --bg2:#a8e6b5; --bg3:#73d49a;
+      --card:#ffffff; --text:#0c2a1a; --muted:#3e6b55; --accent:#16784e;
+      --bleu:#2563eb; --jaune:#f59e0b; --violet:#7c3aed; --rose:#db2777;
+      --green:#00b050; --red:#c00000;
+    }
+    * { box-sizing:border-box }
+    body {
+      margin:0; font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial; color:#0c2a1a;
+      background:linear-gradient(180deg,var(--bg1),var(--bg2),var(--bg3)); min-height:100vh;
+    }
+    .wrap { max-width:980px; margin:24px auto 40px; padding:0 16px }
+    .header { display:flex; flex-direction:column; align-items:center; gap:10px; margin-bottom:12px }
+    h1 { margin:0; font-size:26px; letter-spacing:.2px; color:#0a3d28; text-align:center }
+    .card {
+      background:var(--card); border:1px solid rgba(12,42,26,.08); border-radius:18px;
+      box-shadow:0 10px 30px rgba(12,42,26,.10); padding:22px;
+    }
+    .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px }
+    @media (max-width:800px){ .grid { grid-template-columns:1fr } }
+    .field { display:flex; flex-direction:column; gap:8px }
+    label { font-weight:700; color:#0a3d28 }
+    select, input[type=number] {
+      width:100%; padding:12px 14px; border-radius:12px; border:1px solid rgba(12,42,26,.25);
+      background:#f6fff8; color:#0c2a1a; outline:none; transition:border .15s ease, box-shadow .15s ease
+    }
+    select:focus, input[type=number]:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(22,120,78,.2) }
+    .line { height:1px; background:rgba(12,42,26,.15); margin:18px 0 }
+    .badge { display:inline-block; padding:6px 12px; border-radius:999px; font-weight:800 }
+    .badge.green { color:#fff; background:linear-gradient(90deg,#00b050,#049a47) }
+    .badge.red   { color:#fff; background:linear-gradient(90deg,#c00000,#a40000) }
+
+    .mpr { display:flex; gap:12px; flex-wrap:wrap }
+    .mpr .chip {
+      min-width:180px; display:flex; align-items:center; justify-content:center;
+      padding:12px 16px; border-radius:12px; color:#fff; font-weight:900; cursor:pointer;
+      box-shadow:0 6px 14px rgba(12,42,26,.15); border:2px solid transparent; user-select:none
+    }
+    .mpr .chip.active { outline:3px solid rgba(22,120,78,.25); border-color:#0fb36b }
+    .chip.bleu   { background:var(--bleu) }
+    .chip.jaune  { background:var(--jaune) }
+    .chip.violet { background:var(--violet) }
+    .chip.rose   { background:var(--rose) }
+
+    /* Mobile: 2 chips par ligne */
+    @media (max-width: 640px){
+      .mpr { 
+        display:grid; 
+        grid-template-columns: repeat(2, minmax(0, 1fr)); 
+        gap:10px;
+      }
+      .mpr .chip{
+        min-width:0;
+        width:100%;
+        padding:12px 10px;
+        font-size:15px;
+      }
+    }
+
+    .muted { font-size:12px; color:#3b5f4d }
+    .result { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin-top:16px }
+    .metric { background:#f8fff9; border:1px dashed rgba(12,42,26,.2); border-radius:12px; padding:14px }
+    .metric h3 { margin:0 0 6px; font-size:14px; color:#3b5f4d }
+    .metric .val { font-size:20px; font-weight:800; color:#0a3d28 }
+
+    footer { text-align:center; margin-top:18px; color:#0a3d28; opacity:.9; font-weight:700 }
+    footer .powered { display:inline-block; background:#ffffffc7; border:1px solid rgba(12,42,26,.15); padding:8px 12px; border-radius:999px }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="header">
+      <h1>Calcul Aides PAC</h1>
+    </div>
+
+    <div class="card">
+      <div class="grid">
+        <div class="field">
+          <label for="typeLogement">Type de logement</label>
+          <select id="typeLogement">
+            <option value="maison">Maison individuelle</option>
+            <option value="appartement">Appartement</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="etas">ETAS</label>
+          <select id="etas">
+            <option value="111-140">111 ≤ Etas < 140</option>
+            <option value="140-170" selected>140 ≤ Etas < 170</option>
+            <option value="170-200">170 ≤ Etas < 200</option>
+            <option value="200+">Etas ≥ 200</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="usage">Usage</label>
+          <select id="usage">
+            <option selected>Chauffage</option>
+            <option>Chauffage et ECS</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="surfaceRange">Classe de surface</label>
+          <select id="surfaceRange"></select>
+        </div>
+
+        <div class="field">
+          <label for="zone">Zone géographique</label>
+          <select id="zone">
+            <option value="H1" selected>H1</option>
+            <option value="H2">H2</option>
+            <option value="H3">H3</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="mwhCumacPrice">Prix du MWh cumac</label>
+          <input id="mwhCumacPrice" type="number" step="0.1" min="0" value="12.5" />
+        </div>
+
+        <div class="field" id="ecsField">
+          <label for="ecs">Type d’ECS</label>
+          <select id="ecs">
+            <option value="">Choisir</option>
+            <option>Ballon thermodynamique</option>
+            <option>Ballon électrique</option>
+            <option>Ballon SSC</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Catégorie MPR</label>
+          <div id="mprChips" class="mpr">
+            <div class="chip bleu active" data-cat="bleu">Très modestes</div>
+            <div class="chip jaune" data-cat="jaune">Modestes</div>
+            <div class="chip violet" data-cat="violet">Intermédiaires</div>
+            <div class="chip rose" data-cat="rose">Supérieurs</div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Délégataire</label>
+          <div id="delegBadge" class="badge">—</div>
+        </div>
+      </div>
+
+      <div class="line"></div>
+
+      <div class="result">
+        <div class="metric">
+          <h3>kWh cumac total</h3>
+          <div class="val"><span id="kwhCumacTotal">0</span> kWh</div>
+        </div>
+        <div class="metric">
+          <h3>Prime CEE estimée</h3>
+          <div class="val"><span id="estimatedPrimeCEE">0,00</span> €</div>
+        </div>
+        <div class="metric">
+          <h3>Aide MaPrimeRénov’</h3>
+          <div class="val"><span id="mpRenovAide">0,00</span> €</div>
+        </div>
+        <div class="metric">
+          <h3>Total des aides</h3>
+          <div class="val"><span id="totalAides">0,00</span> €</div>
+        </div>
+      </div>
+    </div>
+
+    <footer><div class="powered">Powered by Gamberge</div></footer>
+  </div>
+
+  <script>
+    const data = {
+      maison: {
+        baseValues: {
+          '111-140': { 'Chauffage et ECS': 96700, 'Chauffage': 79500 },
+          '140-170': { 'Chauffage et ECS': 111500, 'Chauffage': 91600 },
+          '170-200': { 'Chauffage et ECS': 121400, 'Chauffage': 99700 },
+          '200+':    { 'Chauffage et ECS': 125800, 'Chauffage': 103400 }
+        },
+        surfaceRanges: [
+          { label: 'S < 70', value: 0.5, ge130:false },
+          { label: '70 ≤ S < 90', value: 0.7, ge130:false },
+          { label: '90 ≤ S < 110', value: 1, ge130:false },
+          { label: '110 ≤ S < 130', value: 1.1, ge130:false },
+          { label: 'S ≥ 130', value: 1.6, ge130:true }
+        ]
+      },
+      appartement: {
+        baseValues: {
+          '111-140': { 'Chauffage et ECS': 54000, 'Chauffage': 38400 },
+          '140-170': { 'Chauffage et ECS': 62300, 'Chauffage': 44300 },
+          '170-200': { 'Chauffage et ECS': 67800, 'Chauffage': 48200 },
+          '200+':    { 'Chauffage et ECS': 70300, 'Chauffage': 50000 }
+        },
+        surfaceRanges: [
+          { label: 'S < 35', value: 0.5, ge130:false },
+          { label: '35 ≤ S < 60', value: 0.7, ge130:false },
+          { label: '60 ≤ S < 70', value: 1, ge130:false },
+          { label: '70 ≤ S < 90', value: 1.2, ge130:false },
+          { label: '90 ≤ S < 110', value: 1.5, ge130:false },
+          { label: '110 ≤ S ≤ 130', value: 1.9, ge130:true },
+          { label: 'S > 130', value: 2.5, ge130:true }
+        ]
+      },
+      zoneFactors: { 'H1': 1.2, 'H2': 1, 'H3': 0.7 }
+    };
+
+    const mprPAC = { bleu: 5000, jaune: 4000, violet: 3000, rose: 0 };
+
+    // MPR ballon (Thermo corrigé: bleu 1200, jaune 800, violet 400, rose 0)
+    const mprByEcs = {
+      "Ballon thermodynamique": { bleu: 1200, jaune: 800, violet: 400, rose: 0 },
+      "Ballon électrique": { bleu: 0, jaune: 0, violet: 0, rose: 0 },
+      "Ballon SSC": { bleu: 10000, jaune: 8000, violet: 4000, rose: 0 }
+    };
+
+    let currentMprCat = 'bleu';
+
+    function euro(n) { return Number(n).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
+    function updateSurfaceOptions() {
+      const type = document.getElementById('typeLogement').value;
+      const select = document.getElementById('surfaceRange');
+      select.innerHTML = '';
+      data[type].surfaceRanges.forEach((range, idx) => {
+        const opt = document.createElement('option');
+        opt.value = String(idx);
+        opt.textContent = range.label;
+        select.appendChild(opt);
+      });
+      calculate();
+      renderDelegAuto();
+    }
+
+    function getSelectedRange() {
+      const type = document.getElementById('typeLogement').value;
+      const idx = parseInt(document.getElementById('surfaceRange').value || '0', 10);
+      return data[type].surfaceRanges[idx];
+    }
+
+    function renderDelegAuto() {
+      const range = getSelectedRange();
+      const ecs = (document.getElementById('ecs').value || '').toLowerCase();
+      const badge = document.getElementById('delegBadge');
+      if (!range) { badge.textContent='—'; badge.className='badge'; return; }
+      let name, cls;
+      if (!range.ge130) { name='VALOREN'; cls='red'; }
+      else if (ecs.includes('ssc')) { name='VALOREN'; cls='red'; }
+      else { name='ECO NEGOCE'; cls='green'; }
+      badge.className = 'badge ' + cls;
+      badge.textContent = name;
+      updateCumacPrice();
+      calculate();
+    }
+
+    function mprBallonAmount(ecstype, cat) {
+      const table = mprByEcs[ecstype] || { bleu:0, jaune:0, violet:0, rose:0 };
+      return table[cat] || 0;
+    }
+
+    function updateCumacPrice() {
+      // ECO NEGOCE -> 12.5 € bleu, 7.4 € autres
+      // VALOREN    -> 11 € bleu, 7 € autres
+      const deleg = document.getElementById('delegBadge').textContent.trim().toUpperCase();
+      let price = 12.5;
+      if (deleg === 'VALOREN') {
+        price = (currentMprCat === 'bleu') ? 11.0 : 7.0;
+      } else if (deleg === 'ECO NEGOCE') {
+        price = (currentMprCat === 'bleu') ? 12.5 : 7.4;
+      }
+      document.getElementById('mwhCumacPrice').value = price.toFixed(1);
+    }
+
+    function calculate() {
+      const typeLogement = document.getElementById('typeLogement').value;
+      const etas = document.getElementById('etas').value;
+      const usage = document.getElementById('usage').value;
+      const range = getSelectedRange();
+      const zone = document.getElementById('zone').value;
+      const mwhCumacPrice = parseFloat(document.getElementById('mwhCumacPrice').value);
+      const ecsType = document.getElementById('ecs').value;
+      const kwhcThermo = 15600; // valeur fixe quand ballon thermo
+
+      if (!range || isNaN(mwhCumacPrice) || mwhCumacPrice < 0) {
+        document.getElementById('kwhCumacTotal').textContent = "0";
+        document.getElementById('estimatedPrimeCEE').textContent = "0,00";
+        document.getElementById('mpRenovAide').textContent = "0,00";
+        document.getElementById('totalAides').textContent = "0,00";
+        return;
+      }
+
+      const baseKwhCumac = data[typeLogement].baseValues[etas][usage];
+      const surfaceFactor = range.value;
+      const zoneFactor = data.zoneFactors[zone];
+
+      // Volume PAC (avec bonus x5 intégré)
+      let pacKwhc = baseKwhCumac * surfaceFactor * zoneFactor * 5;
+
+      // Volume ballon thermo (saisi) : pas de bonus x5
+      let ballonKwhc = (ecsType === 'Ballon thermodynamique') ? kwhcThermo : 0;
+      document.getElementById('estimatedPrimeCEE').textContent = euro(cee);
+      document.getElementById('mpRenovAide').textContent = euro(mprTotal);
+      document.getElementById('totalAides').textContent = euro(total);
+    }
+
+    function initMprChips() {
+      const cont = document.getElementById('mprChips');
+      cont.querySelectorAll('.chip').forEach(el => {
+        el.addEventListener('click', () => {
+          cont.querySelectorAll('.chip').forEach(s => s.classList.remove('active'));
+          el.classList.add('active');
+          currentMprCat = el.getAttribute('data-cat');
+          updateCumacPrice();
+          calculate();
+          renderDelegAuto();
+        });
+      });
+    }
+
+    document.getElementById('typeLogement').addEventListener('change', () => { updateSurfaceOptions(); });
+    document.getElementById('etas').addEventListener('change', calculate);
+    document.getElementById('usage').addEventListener('change', () => { calculate(); renderDelegAuto(); });
+    document.getElementById('surfaceRange').addEventListener('change', () => { calculate(); renderDelegAuto(); });
+    document.getElementById('zone').addEventListener('change', calculate);
+    document.getElementById('mwhCumacPrice').addEventListener('input', calculate);
+    document.getElementById('ecs').addEventListener('change', () => { calculate(); renderDelegAuto(); });
+
+    document.addEventListener('DOMContentLoaded', () => {
+      initMprChips();
+      updateSurfaceOptions();
+      renderDelegAuto();
+      updateCumacPrice();
+      calculate();
+    });
+  </script>
+</body>
+</html>
