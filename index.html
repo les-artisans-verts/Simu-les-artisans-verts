@@ -27,11 +27,11 @@
     @media (max-width:800px){ .grid { grid-template-columns:1fr } }
     .field { display:flex; flex-direction:column; gap:8px }
     label { font-weight:700; color:#0a3d28 }
-    select, input[type=number], input[type=text] {
+    select, input[type=number] {
       width:100%; padding:12px 14px; border-radius:12px; border:1px solid rgba(12,42,26,.25);
       background:#f6fff8; color:#0c2a1a; outline:none; transition:border .15s ease, box-shadow .15s ease
     }
-    select:focus, input:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(22,120,78,.2) }
+    select:focus, input[type=number]:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(22,120,78,.2) }
     .line { height:1px; background:rgba(12,42,26,.15); margin:18px 0 }
     .badge { display:inline-block; padding:6px 12px; border-radius:999px; font-weight:800 }
     .badge.green { color:#fff; background:linear-gradient(90deg,#00b050,#049a47) }
@@ -49,6 +49,7 @@
     .chip.violet { background:var(--violet) }
     .chip.rose   { background:var(--rose) }
 
+    /* Mobile: 2 chips par ligne */
     @media (max-width: 640px){
       .mpr { 
         display:grid; 
@@ -63,7 +64,7 @@
       }
     }
 
-    .hint { font-size:12px; color:#3b5f4d }
+    .muted { font-size:12px; color:#3b5f4d }
     .result { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin-top:16px }
     .metric { background:#f8fff9; border:1px dashed rgba(12,42,26,.2); border-radius:12px; padding:14px }
     .metric h3 { margin:0 0 6px; font-size:14px; color:#3b5f4d }
@@ -105,11 +106,9 @@
             <option>Chauffage et ECS</option>
           </select>
         </div>
-
         <div class="field">
-          <label for="surfaceM2">Surface chauffée (m²)</label>
-          <input id="surfaceM2" type="number" min="0" step="1" placeholder="ex : 95" />
-          <div class="hint" id="surfaceHint">Facteur surface : 1,0 — Classe 90–109</div>
+          <label for="surfaceRange">Classe de surface</label>
+          <select id="surfaceRange"></select>
         </div>
 
         <div class="field">
@@ -176,8 +175,7 @@
   </div>
 
   <script>
-    // tables de base
-    const base = {
+    const data = {
       maison: {
         baseValues: {
           '111-140': { 'Chauffage et ECS': 96700, 'Chauffage': 79500 },
@@ -185,12 +183,12 @@
           '170-200': { 'Chauffage et ECS': 121400, 'Chauffage': 99700 },
           '200+':    { 'Chauffage et ECS': 125800, 'Chauffage': 103400 }
         },
-        ranges: [
-          {min:0,   max:70,   factor:0.5, label:'S < 70', ge130:false},
-          {min:70,  max:90,   factor:0.7, label:'70 ≤ S < 90', ge130:false},
-          {min:90,  max:110,  factor:1.0, label:'90 ≤ S < 110', ge130:false},
-          {min:110, max:130,  factor:1.1, label:'110 ≤ S < 130', ge130:false},
-          {min:130, max:Infinity, factor:1.6, label:'S ≥ 130', ge130:true},
+        surfaceRanges: [
+          { label: 'S < 70', value: 0.5, ge130:false },
+          { label: '70 ≤ S < 90', value: 0.7, ge130:false },
+          { label: '90 ≤ S < 110', value: 1, ge130:false },
+          { label: '110 ≤ S < 130', value: 1.1, ge130:false },
+          { label: 'S ≥ 130', value: 1.6, ge130:true }
         ]
       },
       appartement: {
@@ -200,20 +198,22 @@
           '170-200': { 'Chauffage et ECS': 67800, 'Chauffage': 48200 },
           '200+':    { 'Chauffage et ECS': 70300, 'Chauffage': 50000 }
         },
-        ranges: [
-          {min:0,   max:35,   factor:0.5, label:'S < 35', ge130:false},
-          {min:35,  max:60,   factor:0.7, label:'35 ≤ S < 60', ge130:false},
-          {min:60,  max:70,   factor:1.0, label:'60 ≤ S < 70', ge130:false},
-          {min:70,  max:90,   factor:1.2, label:'70 ≤ S < 90', ge130:false},
-          {min:90,  max:110,  factor:1.5, label:'90 ≤ S < 110', ge130:false},
-          {min:110, max:130.0001, factor:1.9, label:'110 ≤ S ≤ 130', ge130:true},
-          {min:130.0001, max:Infinity, factor:2.5, label:'S > 130', ge130:true},
+        surfaceRanges: [
+          { label: 'S < 35', value: 0.5, ge130:false },
+          { label: '35 ≤ S < 60', value: 0.7, ge130:false },
+          { label: '60 ≤ S < 70', value: 1, ge130:false },
+          { label: '70 ≤ S < 90', value: 1.2, ge130:false },
+          { label: '90 ≤ S < 110', value: 1.5, ge130:false },
+          { label: '110 ≤ S ≤ 130', value: 1.9, ge130:true },
+          { label: 'S > 130', value: 2.5, ge130:true }
         ]
       },
-      zoneFactors: {H1:1.2, H2:1, H3:0.7}
+      zoneFactors: { 'H1': 1.2, 'H2': 1, 'H3': 0.7 }
     };
 
     const mprPAC = { bleu: 5000, jaune: 4000, violet: 3000, rose: 0 };
+
+    // MPR ballon (Thermo corrigé: bleu 1200, jaune 800, violet 400, rose 0)
     const mprByEcs = {
       "Ballon thermodynamique": { bleu: 1200, jaune: 800, violet: 400, rose: 0 },
       "Ballon électrique": { bleu: 0, jaune: 0, violet: 0, rose: 0 },
@@ -222,66 +222,72 @@
 
     let currentMprCat = 'bleu';
 
-    const euro = n => Number(n).toLocaleString('fr-FR', {minimumFractionDigits:2, maximumFractionDigits:2});
+    function euro(n) { return Number(n).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
-    function pickRange(type, s) {
-      const arr = base[type].ranges;
-      for (const r of arr) {
-        if (s >= r.min && s < r.max) return r;
-      }
-      return arr.find(r=>r.factor===1) || arr[0];
+    function updateSurfaceOptions() {
+      const type = document.getElementById('typeLogement').value;
+      const select = document.getElementById('surfaceRange');
+      select.innerHTML = '';
+      data[type].surfaceRanges.forEach((range, idx) => {
+        const opt = document.createElement('option');
+        opt.value = String(idx);
+        opt.textContent = range.label;
+        select.appendChild(opt);
+      });
+      calculate();
+      renderDelegAuto();
     }
 
-    function updateSurfaceHint() {
+    function getSelectedRange() {
       const type = document.getElementById('typeLogement').value;
-      const s = parseFloat(document.getElementById('surfaceM2').value);
-      const hint = document.getElementById('surfaceHint');
-      if (isNaN(s)) { hint.textContent = 'Facteur surface : 1,0 — Classe 90–109'; return; }
-      const r = pickRange(type, s);
-      hint.textContent = `Facteur surface : ${r.factor.toLocaleString('fr-FR')} — ${r.label}`;
+      const idx = parseInt(document.getElementById('surfaceRange').value || '0', 10);
+      return data[type].surfaceRanges[idx];
     }
 
     function renderDelegAuto() {
-      const type = document.getElementById('typeLogement').value;
-      const s = parseFloat(document.getElementById('surfaceM2').value);
+      const range = getSelectedRange();
       const ecs = (document.getElementById('ecs').value || '').toLowerCase();
       const badge = document.getElementById('delegBadge');
-      let ge130 = false;
-      if (!isNaN(s)) ge130 = s >= 130;
+      if (!range) { badge.textContent='—'; badge.className='badge'; return; }
       let name, cls;
-      if (ge130 && !ecs.includes('ssc')) { name='ECO NEGOCE'; cls='green'; }
-      else { name='VALOREN'; cls='red'; }
+      if (!range.ge130) { name='VALOREN'; cls='red'; }
+      else if (ecs.includes('ssc')) { name='VALOREN'; cls='red'; }
+      else { name='ECO NEGOCE'; cls='green'; }
       badge.className = 'badge ' + cls;
       badge.textContent = name;
       updateCumacPrice();
-    }
-
-    function updateCumacPrice() {
-      const deleg = document.getElementById('delegBadge').textContent.trim().toUpperCase();
-      let price;
-      if (deleg === 'VALOREN') {
-        price = (currentMprCat === 'bleu') ? 11.0 : 7.0;
-      } else {
-        price = (currentMprCat === 'bleu') ? 12.5 : 7.4;
-      }
-      document.getElementById('mwhCumacPrice').value = price.toFixed(1);
+      calculate();
     }
 
     function mprBallonAmount(ecstype, cat) {
-      const table = mprByEcs[ecstype] || {bleu:0, jaune:0, violet:0, rose:0};
+      const table = mprByEcs[ecstype] || { bleu:0, jaune:0, violet:0, rose:0 };
       return table[cat] || 0;
+    }
+
+    function updateCumacPrice() {
+      // ECO NEGOCE -> 12.5 € bleu, 7.4 € autres
+      // VALOREN    -> 11 € bleu, 7 € autres
+      const deleg = document.getElementById('delegBadge').textContent.trim().toUpperCase();
+      let price = 12.5;
+      if (deleg === 'VALOREN') {
+        price = (currentMprCat === 'bleu') ? 11.0 : 7.0;
+      } else if (deleg === 'ECO NEGOCE') {
+        price = (currentMprCat === 'bleu') ? 12.5 : 7.4;
+      }
+      document.getElementById('mwhCumacPrice').value = price.toFixed(1);
     }
 
     function calculate() {
       const typeLogement = document.getElementById('typeLogement').value;
       const etas = document.getElementById('etas').value;
       const usage = document.getElementById('usage').value;
-      const s = parseFloat(document.getElementById('surfaceM2').value);
+      const range = getSelectedRange();
       const zone = document.getElementById('zone').value;
       const mwhCumacPrice = parseFloat(document.getElementById('mwhCumacPrice').value);
       const ecsType = document.getElementById('ecs').value;
+      const kwhcThermo = 15600; // valeur fixe quand ballon thermo
 
-      if (isNaN(mwhCumacPrice) || mwhCumacPrice < 0) {
+      if (!range || isNaN(mwhCumacPrice) || mwhCumacPrice < 0) {
         document.getElementById('kwhCumacTotal').textContent = "0";
         document.getElementById('estimatedPrimeCEE').textContent = "0,00";
         document.getElementById('mpRenovAide').textContent = "0,00";
@@ -289,31 +295,15 @@
         return;
       }
 
-      const baseKwhCumac = base[typeLogement].baseValues[etas][usage];
-      const r = isNaN(s) ? pickRange(typeLogement, 95) : pickRange(typeLogement, s); // défaut classe 90–109
-      const surfaceFactor = r.factor;
-      const zoneFactor = base.zoneFactors[zone];
+      const baseKwhCumac = data[typeLogement].baseValues[etas][usage];
+      const surfaceFactor = range.value;
+      const zoneFactor = data.zoneFactors[zone];
 
-      let finalKwhCumac = baseKwhCumac * surfaceFactor * zoneFactor * 5;
+      // Volume PAC (avec bonus x5 intégré)
+      let pacKwhc = baseKwhCumac * surfaceFactor * zoneFactor * 5;
 
-      // CEE PAC
-      let cee = (finalKwhCumac / 1000) * mwhCumacPrice;
-
-      // + CEE Ballon Thermodynamique (forfait selon délégataire)
-      const deleg = document.getElementById('delegBadge').textContent.trim().toUpperCase();
-      if (ecsType === 'Ballon thermodynamique') {
-        const ceeBallon = (deleg === 'VALOREN') ? 109.2 : (deleg === 'ECO NEGOCE' ? 101.4 : 0);
-        cee += ceeBallon;
-      }
-
-      // MPR = PAC + Ballon (selon sélection)
-      const mprPac = mprPAC[currentMprCat] || 0;
-      const mprBallon = ecsType ? mprBallonAmount(ecsType, currentMprCat) : 0;
-      const mprTotal = mprPac + mprBallon;
-
-      const total = cee + mprTotal;
-
-      document.getElementById('kwhCumacTotal').textContent = Math.round(finalKwhCumac).toLocaleString('fr-FR');
+      // Volume ballon thermo (saisi) : pas de bonus x5
+      let ballonKwhc = (ecsType === 'Ballon thermodynamique') ? kwhcThermo : 0;
       document.getElementById('estimatedPrimeCEE').textContent = euro(cee);
       document.getElementById('mpRenovAide').textContent = euro(mprTotal);
       document.getElementById('totalAides').textContent = euro(total);
@@ -328,22 +318,22 @@
           currentMprCat = el.getAttribute('data-cat');
           updateCumacPrice();
           calculate();
+          renderDelegAuto();
         });
       });
     }
 
-    // events
-    document.getElementById('typeLogement').addEventListener('change', () => { updateSurfaceHint(); renderDelegAuto(); calculate(); });
+    document.getElementById('typeLogement').addEventListener('change', () => { updateSurfaceOptions(); });
     document.getElementById('etas').addEventListener('change', calculate);
-    document.getElementById('usage').addEventListener('change', calculate);
-    document.getElementById('surfaceM2').addEventListener('input', () => { updateSurfaceHint(); renderDelegAuto(); calculate(); });
+    document.getElementById('usage').addEventListener('change', () => { calculate(); renderDelegAuto(); });
+    document.getElementById('surfaceRange').addEventListener('change', () => { calculate(); renderDelegAuto(); });
     document.getElementById('zone').addEventListener('change', calculate);
     document.getElementById('mwhCumacPrice').addEventListener('input', calculate);
-    document.getElementById('ecs').addEventListener('change', () => { renderDelegAuto(); calculate(); });
+    document.getElementById('ecs').addEventListener('change', () => { calculate(); renderDelegAuto(); });
 
     document.addEventListener('DOMContentLoaded', () => {
       initMprChips();
-      updateSurfaceHint();
+      updateSurfaceOptions();
       renderDelegAuto();
       updateCumacPrice();
       calculate();
